@@ -115,25 +115,20 @@ async def run(session_id: str, goal: str, model: str, temperature: float):
         {
             "node": "reporting",
             "output": {
-                "report": {
-                    "title": f"Research report: {goal}",
-                    "summary": "Placeholder summary tying together the findings above.",
-                    "sections": [
-                        {
-                            "heading": "Background",
-                            "content": "Placeholder background section content.",
-                        },
-                        {
-                            "heading": "Recent developments",
-                            "content": "Placeholder recent-developments section content.",
-                        },
-                        {
-                            "heading": "Comparison",
-                            "content": "Placeholder comparison section content.",
-                        },
-                    ],
-                    "sources": ["placeholder.pdf", "web search"],
-                },
+                "report": (
+                    f"# Research report: {goal}\n\n"
+                    "Placeholder summary tying together the findings above.\n\n"
+                    "## Key findings\n"
+                    "- Placeholder key finding one.\n"
+                    "- Placeholder key finding two.\n\n"
+                    "## Risks / open gaps\n"
+                    "- Placeholder risk or open gap noted here.\n\n"
+                    "## Confidence: high\n"
+                    "*(iteration 2)*\n\n"
+                    "## Sources\n"
+                    "- placeholder.pdf\n"
+                    "- web search"
+                ),
                 "tokens_used": 420,
             },
         },

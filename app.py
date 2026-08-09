@@ -10,13 +10,13 @@ line should need to change when that swap happens.
 import streamlit as st
 
 from frontend.http_client import (
-    get_available_models,
     get_api_key_status,
-    set_api_key,
+    get_available_models,
     get_config,
-    upload_files,
-    run_agent_stream,
     new_session_id,
+    run_agent_stream,
+    set_api_key,
+    upload_files,
 )
 
 st.set_page_config(page_title="Research Agent", layout="wide")
@@ -47,19 +47,6 @@ if "uploaded_file_names" not in st.session_state:
 def _on_api_key_change():
     new_key = st.session_state.api_key_input
     set_api_key(new_key)
-
-
-def report_to_markdown(report: dict) -> str:
-    lines = [f"# {report['title']}", "", report["summary"], ""]
-    for section in report["sections"]:
-        lines.append(f"## {section['heading']}")
-        lines.append(section["content"])
-        lines.append("")
-    if report.get("sources"):
-        lines.append("## Sources")
-        for src in report["sources"]:
-            lines.append(f"- {src}")
-    return "\n".join(lines)
 
 
 # ---------- sidebar: key + model/temperature controls + token counter ----------
@@ -138,6 +125,7 @@ with chat_col:
 
         with st.chat_message("assistant"):
             run_tokens = 0
+            error_message = None
             with st.status("Running agent...", expanded=True) as status:
                 for event in run_agent_stream(
                     st.session_state.session_id, goal, model, temperature
@@ -177,15 +165,46 @@ with chat_col:
                     elif node == "reporting":
                         status.write("**Reporting** assembled the final report")
                         st.session_state.last_report = output["report"]
+                    elif node == "error":
+                        # e.g. backend has no GROQ_API_KEY configured — see
+                        # backend/agent_runner.py. Surfaced as an event
+                        # rather than an exception so it reaches the UI as
+                        # a readable message instead of a truncated stream.
+                        error_message = output["message"]
+                        status.write(f"⚠️ **Error**: {error_message}")
+                    else:
+                        # Fallback so any future/unrecognized node type is
+                        # still visible instead of silently doing nothing.
+                        status.write(f"**{node}**: {output}")
 
-                status.update(label="Run complete", state="complete", expanded=False)
+                if error_message:
+                    status.update(label="Run failed", state="error", expanded=True)
+                else:
+                    status.update(
+                        label="Run complete", state="complete", expanded=False
+                    )
 
             st.session_state.tokens += run_tokens
+            # Write straight into the placeholder created earlier in the sidebar —
+            # updates that slot in place, no rerun, st.status above stays visible.
             tokens_placeholder.metric("Tokens used (session)", st.session_state.tokens)
 
-            summary = "Report ready — see the export button in the sidebar panel below."
-            st.markdown(summary)
-            st.session_state.messages.append({"role": "assistant", "content": summary})
+            # The report arrives from the reporting node already rendered as
+            # markdown (see agent/nodes.py:render_report_markdown) — display
+            # it as-is. Using it as the message content (not a separate
+            # "done" line) means it also replays correctly from the history
+            # loop above on future reruns, no extra persistence needed.
+            if error_message:
+                report_md = f"⚠️ Run failed: {error_message}"
+            else:
+                report_md = (
+                    st.session_state.last_report
+                    or "The run completed, but no report was produced."
+                )
+            st.markdown(report_md)
+            st.session_state.messages.append(
+                {"role": "assistant", "content": report_md}
+            )
 
 with state_col:
     st.subheader("State")
@@ -219,10 +238,9 @@ with state_col:
 
     st.divider()
     if st.session_state.last_report:
-        report_md = report_to_markdown(st.session_state.last_report)
         st.download_button(
             "Download report (.md)",
-            data=report_md,
+            data=st.session_state.last_report,
             file_name="research_report.md",
             mime="text/markdown",
         )

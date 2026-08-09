@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from agent.config import MAX_RETRIES, QUALITY_THRESHOLD
 from agent.retrieval import add_documents, build_retriever
-from backend import placeholder_agent, runtime_config, session_store
+from backend import agent_runner, runtime_config, session_store
 from backend.llm_client import MissingAPIKeyError, get_available_models
 from backend.schemas import (
     ApiKeyUpdate,
@@ -64,7 +64,7 @@ async def upload(session_id: str, files: list[UploadFile] = File(...)):
 @router.post("/run")
 async def run(body: RunRequest):
     async def event_stream():
-        async for event in placeholder_agent.run(
+        async for event in agent_runner.run(
             body.session_id, body.goal, body.model, body.temperature
         ):
             yield f"data: {json.dumps(event)}\n\n"

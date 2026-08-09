@@ -32,6 +32,9 @@ class MissingAPIKeyError(RuntimeError):
 
 
 def get_api_key():
+    from dotenv import load_dotenv
+
+    load_dotenv()
     key = os.environ.get("GROQ_API_KEY", "")
     if not key:
         raise MissingAPIKeyError
